@@ -1,0 +1,43 @@
+
+¬
+src/command.protoESB"‘
+Command
+cmd (2.ESB.Command.Cmd
+source_proxy_guid (	
+payload (
+target_proxy_guid (	
+
+identifier (	
+	guid_from (	
+guid_to (	
+version (
+
+start_time	 (
+
+timeout_ms
+ (-
+	reg_entry (2.ESB.Command.RegistryEntry‰
+RegistryEntry;
+type (2.ESB.Command.RegistryEntryType:INVOKE_METHOD
+
+identifier (	
+method_guid (	
+
+proxy_guid (	"Ë
+Cmd	
+ERROR
+RESPONSE
+
+NODE_HELLO
+PROXY_HELLO
+PING
+PONG
+
+INVOKE
+REGISTER_INVOKE
+REGISTER_INVOKE_OK	
+REGISTRY_EXCHANGE_REQUEST
+
+REGISTRY_EXCHANGE_RESPONSE"&
+RegistryEntryType
+INVOKE_METHOD

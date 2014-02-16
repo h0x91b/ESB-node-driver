@@ -1,0 +1,33 @@
+{
+  "name": "esb-node-driver",
+  "version": "0.0.1",
+  "description": "Driver for ESB (Connector)",
+  "main": "main.js",
+  "directories": {
+    "example": "examples"
+  },
+  "dependencies": {
+    "extend": "~1.2.1",
+    "node-protobuf": "~1.0.10",
+    "redis": "~0.10.0",
+    "uuid": "~1.4.1",
+    "zmq": "~2.6.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/h0x91b/ESB-node-driver.git"
+  },
+  "keywords": [
+    "ESB"
+  ],
+  "author": "Arseniy Pavlenko",
+  "license": "LGPL3",
+  "bugs": {
+    "url": "https://github.com/h0x91b/ESB-node-driver/issues"
+  },
+  "homepage": "https://github.com/h0x91b/ESB-node-driver"
+}
