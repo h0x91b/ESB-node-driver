@@ -10,7 +10,6 @@
     "extend": "~1.2.1",
     "node-protobuf": "~1.0.10",
     "redis": "~0.10.0",
-    "uuid": "~1.4.1",
     "zmq": "~2.6.0"
   },
   "devDependencies": {},

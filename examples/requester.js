@@ -2,7 +2,7 @@ var ESB = require('../'); //in your case require('esb-node-driver');
 
 var esb = new ESB({
 	publisherHost: process.argv[2] || 'h0x91b.toyga.local', //your hostname needed for back connect from ESB proxy
-	publisherPort: process.argv[3] || 7781,
+	publisherPort: process.argv[3] || 7786,
 	redisHost: 'esb-redis', //Host with registry used by esb, place it in /etc/hosts
 	redisPort: 6379
 });
@@ -15,13 +15,15 @@ esb.on('ready', function(){
 	console.log('ESB ready for use');
 	
 	setInterval(function(){
-		esb.invoke('/math/plus', {a: 2, b: 3}, function(err, resp, errStr){
+		var a = Math.floor(Math.random()*50);
+		var b = Math.floor(Math.random()*50);
+		esb.invoke('/math/plus', {a: a, b: b}, function(err, resp, errStr){
 			if(err){
 				console.log(err, errStr);
 				return;
 			}
-			console.assert(resp == 5);
-			console.log('2+3=%s', resp);
+			console.assert(resp == a+b);
+			console.log('%s+%s=%s', a, b, resp);
 		});
 	}, 1000);
 });

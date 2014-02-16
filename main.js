@@ -1,6 +1,5 @@
 var extend = require('extend');
 var zmq = require('zmq');
-var uuid = require('uuid');
 var fs = require("fs")
 var proto = require("node-protobuf").Protobuf;
 var pb = new proto(fs.readFileSync(__dirname+"/command.desc"));
@@ -8,6 +7,7 @@ var util = require("util");
 var events = require("events");
 var Redis = require('redis');
 
+var guidSize = 16;
 
 var _config = {
 	publisherHost: 'h0x91b.toyga.local',
@@ -19,7 +19,7 @@ var _config = {
 function ESB(config) {
 	events.EventEmitter.call(this);
 	this.config = extend(true, {}, _config, config);
-	this.guid = ('{'+uuid.v4()+'}').toUpperCase();
+	this.guid = genGuid();
 	this.proxyGuid = '';
 	this.ready = false;
 	console.log('new ESB driver %s', this.guid);
@@ -97,7 +97,7 @@ ESB.prototype.connect= function(){
 };
 
 ESB.prototype.sendHello= function() {
-	var cmdGuid = ('{'+uuid.v4()+'}').toUpperCase();
+	var cmdGuid = genGuid();
 	
 	var obj = {
 		cmd: 'NODE_HELLO',
@@ -142,7 +142,7 @@ ESB.prototype.sendHello= function() {
 ESB.prototype.ping = function(){
 	//console.log('send ping to %s', this.guid, this.proxyGuid);
 	if(!this.ready) return;
-	var cmdGuid = ('{'+uuid.v4()+'}').toUpperCase();
+	var cmdGuid = genGuid();
 	var obj = {
 		cmd: 'PING',
 		payload: 'hi',
@@ -178,7 +178,7 @@ ESB.prototype.ping = function(){
 ESB.prototype.onMessage= function(data) {
 	try {
 		//console.log('ESB.prototype.onMessage', data);
-		data = data.slice(38); //38 sizeof guid in bytes
+		data = data.slice(guidSize);
 		var respObj = pb.Parse(data, "ESB.Command");
 		//console.log('suscriber got message: ', respObj);
 		switch(respObj.cmd)
@@ -258,7 +258,7 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 	} else
 		options.timeout = 0;
 	
-	var cmdGuid = ('{'+uuid.v4()+'}').toUpperCase();
+	var cmdGuid = genGuid();
 	//console.log('invoke guid for response', cmdGuid);
 	
 	this.responseCallbacks[cmdGuid] = function(err, data, errString){
@@ -316,7 +316,7 @@ ESB.prototype.register = function(_identifier, version, cb, options) {
 	options = extend(true, {
 		version: 1,
 		timeout: 3000,
-		guid: ('{'+uuid.v4()+'}').toUpperCase()
+		guid: genGuid()
 	}, options);
 	var identifier = _identifier+'/v'+options.version;
 	
@@ -381,5 +381,14 @@ ESB.prototype.register = function(_identifier, version, cb, options) {
 	
 	return cmdGuid;
 };
+
+function genGuid() {
+	var a = [];
+	var alphabet = '01234567890ABCDEF';
+	for(var i=0;i<guidSize;i++){
+		a.push(alphabet[~~(Math.random()*16)]);
+	}
+	return a.join('');
+}
 
 module.exports = ESB;
