@@ -282,8 +282,8 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 			guid_from: cmdGuid,
 			//target_proxy_guid: this.proxyGuid,
 			source_proxy_guid: this.guid,
-			start_time: +new Date,
-			timeout_ms: options.timeout
+			//start_time: +new Date,
+			//timeout_ms: options.timeout
 		}
 		//console.log(obj, this.proxyGuid);
 		var buf = pb.Serialize(obj, "ESB.Command");
