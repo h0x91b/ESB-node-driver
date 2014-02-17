@@ -172,13 +172,18 @@ ESB.prototype.ping = function(){
 		delete self.responseCallbacks[cmdGuid];
 	}
 	
-	this.publisherSocket.send(new Buffer(this.proxyGuid+buf));
+	
+	var b = new Buffer(guidSize + 1 + buf.length);
+	b.write(this.proxyGuid, 'binary');
+	b.write('\t', guidSize, 1, 'binary');
+	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+	this.publisherSocket.send(b);
 };
 
 ESB.prototype.onMessage= function(data) {
 	try {
 		//console.log('ESB.prototype.onMessage', data);
-		data = data.slice(guidSize);
+		data = data.slice(data.toString('utf-8').indexOf('\t')+1);
 		var respObj = pb.Parse(data, "ESB.Command");
 		//console.log('suscriber got message: ', respObj);
 		switch(respObj.cmd)
@@ -212,7 +217,11 @@ ESB.prototype.onMessage= function(data) {
 				guid_from: this.guid,
 			}
 			var buf = pb.Serialize(obj, "ESB.Command");
-			this.publisherSocket.send(this.guid+buf);
+			var b = new Buffer(guidSize + 1 + buf.length);
+			b.write(this.proxyGuid, 'binary');
+			b.write('\t', guidSize, 1, 'binary');
+			b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+			this.publisherSocket.send(b);
 			break;
 		case 'ERROR':
 			console.log('got ERROR response: ', respObj.payload.toString());
@@ -287,7 +296,11 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 		}
 		//console.log(obj, this.proxyGuid);
 		var buf = pb.Serialize(obj, "ESB.Command");
-		this.publisherSocket.send(new Buffer(this.proxyGuid+buf));
+		var b = new Buffer(guidSize + 1 + buf.length);
+		b.write(this.proxyGuid, 'binary');
+		b.write('\t', guidSize, 1, 'binary');
+		b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+		this.publisherSocket.send(b);
 	} catch(e){
 		isCalled = true;
 		if(id) clearTimeout(id);
@@ -353,9 +366,13 @@ ESB.prototype.register = function(_identifier, version, cb, options) {
 					}
 					//console.log('invoke method send response',obj);
 					var buf = pb.Serialize(obj, "ESB.Command");
-					self.publisherSocket.send(self.proxyGuid+buf);
+					var b = new Buffer(guidSize + 1 + buf.length);
+					b.write(self.proxyGuid, 'binary');
+					b.write('\t', guidSize, 1, 'binary');
+					b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+					self.publisherSocket.send(b);
 				} catch(e){
-					cb('Exception', null, 'Exception while encoding/sending message: '+e.toString(), resp);
+					console.log('Exception while encoding/sending message after invoke: '+e.toString(), resp);
 				}
 			
 			});
@@ -374,9 +391,13 @@ ESB.prototype.register = function(_identifier, version, cb, options) {
 		}
 		//console.log('register',obj);
 		var buf = pb.Serialize(obj, "ESB.Command");
-		this.publisherSocket.send(this.proxyGuid+buf);
+		var b = new Buffer(guidSize + 1 + buf.length);
+		b.write(this.proxyGuid, 'binary');
+		b.write('\t', guidSize, 1, 'binary');
+		b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+		this.publisherSocket.send(b);
 	} catch(e){
-		cb('Exception', null, 'Exception while encoding/sending message: '+e.toString());
+		console.log('Exception', null, 'Exception while encoding/sending message: '+e.toString());
 	}
 	
 	return cmdGuid;
