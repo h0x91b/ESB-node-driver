@@ -25,6 +25,8 @@ function ESB(config) {
 	console.log('new ESB driver %s', this.guid);
 	this.responseCallbacks = [];
 	this.invokeMethods = [];
+	this.sendQueue = [];
+	this.lastSend = +new Date;
 	var socket = zmq.socket('req');
 	var self = this;
 	this.requestSocket = socket;
@@ -137,6 +139,9 @@ ESB.prototype.sendHello= function() {
 			self.sendRegistry();
 			self.ping();
 		}, 1000);
+		setInterval(function(){
+			self.sendPostQueue();
+		}, 50);
 	});
 	this.requestSocket.send(buf);
 	console.log('NODE_HELLO sended');
@@ -303,7 +308,13 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 		b.write(this.proxyGuid, 'binary');
 		b.write('\t', guidSize, 1, 'binary');
 		b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-		this.publisherSocket.send(b);
+		var now = +new Date;
+		if(now - this.lastSend < 3) {
+			this.sendQueue.push(b);
+		} else {
+			this.publisherSocket.send(b);
+			this.sendPostQueue();
+		}
 	} catch(e){
 		isCalled = true;
 		if(id) clearTimeout(id);
@@ -313,6 +324,15 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 	
 	return cmdGuid;
 };
+
+ESB.prototype.sendPostQueue = function(){
+	if(!this.ready) return;
+	for(var i=0;i<this.sendQueue.length;i++){
+		this.publisherSocket.send(this.sendQueue[i]);
+	}
+	this.sendQueue = [];
+	this.lastSend = +new Date;
+}
 
 ESB.prototype.sendRegistry = function(){
 	if(!this.ready) return;
@@ -373,7 +393,14 @@ ESB.prototype.register = function(_identifier, version, cb, options, internalCal
 					b.write(self.proxyGuid, 'binary');
 					b.write('\t', guidSize, 1, 'binary');
 					b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-					self.publisherSocket.send(b);
+					var now = +new Date;
+					if(now - self.lastSend < 3) {
+						self.sendQueue.push(b);
+					} else {
+						self.publisherSocket.send(b);
+						self.sendPostQueue();
+					}
+					//self.publisherSocket.send(b);
 				} catch(e){
 					console.log('Exception while encoding/sending message after invoke: '+e.toString(), resp);
 				}

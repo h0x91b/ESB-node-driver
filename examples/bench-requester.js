@@ -34,6 +34,8 @@ esb.on('ready', function(){
 					totaltime += time;
 					if(maxtime<time) maxtime = time;
 					if(time<mintime) mintime = time;
+				}, {
+					timeout: 0
 				});
 			})();
 		}
@@ -42,11 +44,12 @@ esb.on('ready', function(){
 	setInterval(function(){
 		var dt = new Date - starttime;
 		console.log(
-			'%s invokes per second, avg request time: %s ms, worst: %s ms, best: %s ms', 
+			'%s invokes per second, avg request time: %s ms, worst: %s ms, best: %s ms, invokes without response in queue: %s', 
 			(responses/dt*1000).toFixed(2), 
 			(totaltime/responses).toFixed(2), 
 			maxtime,
-			mintime
+			mintime,
+			Object.keys(esb.responseCallbacks).length
 		);
 		responses = 0;
 		totaltime = 0;
