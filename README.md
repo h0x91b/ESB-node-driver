@@ -55,7 +55,7 @@ Check the examples directory.
 			//lets invoke method above every second
 			esb.invoke('/math/plus', {a: 2, b: 3}, function(err, resp, errStr){
 				if(err){
-					console.log('error while invoking a /math/plus',err, errStr);
+					console.log('error while invoking a /math/plus', err, errStr);
 					return;
 				}
 				console.assert(resp == 5);
@@ -69,12 +69,15 @@ API
 ===
 
 * ESB.register(&lt;identifier>, &lt;version, &lt;callback>[ ,options])
-	Currently is now options here
+
+Currently is no options here
 
 * ESB.invoke(&lt;identifier>, &lt;data>, &lt;callback>[ ,options])
-	Options may contain:
-	* version - by default version is 1
-	* timeout - in ms, by default 15000
+
+Options may contain:
+
+* version - by default version is 1
+* timeout - in ms, by default 15000
 
 Building zmq and protobuf from source
 ===
