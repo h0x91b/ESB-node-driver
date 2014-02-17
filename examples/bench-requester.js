@@ -9,15 +9,19 @@ var esb = new ESB({
 esb.on('ready', function(){
 	console.log('esb is ready');
 	setInterval(function(){
-	for(var i=0;i<250;i++)
-		esb.invoke('/math/plus', {a: 2, b: 2}, function(err, resp, errStr){
-			if(err){
-				console.log(err, errStr);
-				return;
-			}
-			console.assert(resp == 4);
-			responses++;
-		});
+	for(var i=0;i<300;i++)
+		(function(){
+			var a = Math.floor(Math.random()*50);
+			var b = Math.floor(Math.random()*50);
+			esb.invoke('/math/plus', {a: a, b: b}, function(err, resp, errStr){
+				if(err){
+					console.log(err, errStr);
+					return;
+				}
+				console.assert(resp == a+b);
+				responses++;
+			});
+		})();
 	},10);
 	
 	setInterval(function(){

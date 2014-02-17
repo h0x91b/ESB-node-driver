@@ -249,7 +249,7 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 	}
 	options = extend(true, {
 		version: 1,
-		timeout: 3000
+		timeout: 15000
 	}, options);
 	identifier = identifier+'/v'+options.version;
 	//console.log('invoke()', identifier, options, data);
@@ -262,7 +262,7 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 			if(isCalled) return;
 			isCalled = true;
 			delete self.responseCallbacks[cmdGuid];
-			cb('Timeout', null, 'Timeout triggered by nodeConnector');
+			cb('Timeout', null, 'Timeout triggered by esb-node-driver');
 		};
 	} else
 		options.timeout = 0;
@@ -315,20 +315,20 @@ ESB.prototype.sendRegistry = function(){
 	if(!this.ready) return;
 	for(var g in this.invokeMethods){
 		var m = this.invokeMethods[g];
-		this.register(m.identifier, m.version, m.method, m.options);
+		this.register(m.identifier, m.version, m.method, m.options, true);
 	}
 }
 
-ESB.prototype.register = function(_identifier, version, cb, options) {
+ESB.prototype.register = function(_identifier, version, cb, options, internalCall) {
 	if(!this.ready){
-		cb('Not connected!', null, 'Currently driver not connected to any proxy.');
+		if(!internalCall)
+			cb('Not connected!', null, 'Currently driver not connected to any proxy.');
 		return;
 	}
 	
 	//console.log('register', _identifier, version);
 	options = extend(true, {
 		version: 1,
-		timeout: 3000,
 		guid: genGuid()
 	}, options);
 	var identifier = _identifier+'/v'+options.version;
