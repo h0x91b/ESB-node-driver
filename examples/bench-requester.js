@@ -3,13 +3,16 @@ var ESB = require('..');
 responses = 0;
 
 var esb = new ESB({
-	publisherPort: process.argv[3] || 7790
+	publisherHost: process.argv[2] || 'h0x91b.toyga.local', //your hostname needed for back connect from ESB proxy
+	publisherPort: process.argv[3] || 7790,
+	redisHost: 'esb-redis', //Host with registry used by esb, place it in /etc/hosts
+	redisPort: 6379
 });
 
 esb.on('ready', function(){
 	console.log('esb is ready');
 	setInterval(function(){
-	for(var i=0;i<300;i++)
+	for(var i=0;i<100;i++)
 		(function(){
 			var a = Math.floor(Math.random()*50);
 			var b = Math.floor(Math.random()*50);

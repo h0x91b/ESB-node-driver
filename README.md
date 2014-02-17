@@ -11,7 +11,7 @@ And then:
 
 	npm install esb-node-driver
 
-Place into /etc/hosts a ip for domain `esb-redis`
+You will need a redis server, place his ip into /etc/hosts as domain `esb-redis`.
 
 Usage
 ===
@@ -68,12 +68,12 @@ Check the examples directory.
 API
 ===
 
-* ESB.register(<identifier>, <version>, <callback>[ ,options])
+* ESB.register(&lt;identifier>, &lt;version, &lt;callback>[ ,options])
 	Currently is now options here
 
-* ESB.invoke(<identifier>, <data>, <callback>[ ,options])
+* ESB.invoke(&lt;identifier>, &lt;data>, &lt;callback>[ ,options])
 	Options may contain:
-	* version - by default it 1
+	* version - by default version is 1
 	* timeout - in ms, by default 15000
 
 Building zmq and protobuf from source
