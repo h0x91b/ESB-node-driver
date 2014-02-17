@@ -33,11 +33,14 @@ function ESB(config) {
 		self.emit('error', err);
 	});
 	this.subscribeSocket = zmq.socket('sub');
+	this.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
 	this.subscribeSocket.on('error', function(err){
 		console.log('subscribeSocket error', err);
 		self.emit('error', err);
 	});
 	this.publisherSocket = zmq.socket('pub');
+	this.publisherSocket.setsockopt(zmq.ZMQ_SNDBUF, 256*1024);
+	this.publisherSocket.setsockopt(zmq.ZMQ_SNDHWM, 5000);
 	this.publisherSocket.on('error', function(err){
 		console.log('publisherSocket error', err);
 		self.emit('error', err);

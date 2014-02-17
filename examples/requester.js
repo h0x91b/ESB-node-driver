@@ -17,13 +17,14 @@ esb.on('ready', function(){
 	setInterval(function(){
 		var a = Math.floor(Math.random()*50);
 		var b = Math.floor(Math.random()*50);
+		var dt = +new Date;
 		esb.invoke('/math/plus', {a: a, b: b}, function(err, resp, errStr){
 			if(err){
 				console.log(err, errStr);
 				return;
 			}
 			console.assert(resp == a+b);
-			console.log('%s+%s=%s', a, b, resp);
+			console.log('%s+%s=%s response take %s ms', a, b, resp, (new Date - dt));
 		});
 	}, 1000);
 });
