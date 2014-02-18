@@ -79,6 +79,29 @@ Options may contain:
 * version - by default version is 1
 * timeout - in ms, by default 15000
 
+Issues
+===
+
+If you get error similar to this
+
+	module.js:356
+	  Module._extensions[extension](this, filename);
+	                               ^
+	Error: libzmq.so.3: cannot open shared object file: No such file or directory
+	    at Module.load (module.js:356:32)
+	    at Function.Module._load (module.js:312:12)
+	    at Module.require (module.js:364:17)
+	    at require (module.js:380:17)
+	    at Object.<anonymous> (/root/node_modules/ESB-proxy-server/main.js:7:10)
+	    at Module._compile (module.js:456:26)
+	    at Object.Module._extensions..js (module.js:474:10)
+	    at Module.load (module.js:356:32)
+	    at Function.Module._load (module.js:312:12)
+	    at Function.Module.runMain (module.js:497:10)
+
+You need to add `export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"` to your `~/.bashrc`
+
+
 Building zmq and protobuf from source
 ===
 
