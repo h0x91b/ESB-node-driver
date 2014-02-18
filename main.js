@@ -48,7 +48,7 @@ function ESB(config) {
 		console.log('publisherSocket error', err);
 		self.emit('error', err);
 	});
-	console.log('try to bind', 'tcp://*:'+this.config.publisherPort);
+	//console.log('try to bind', 'tcp://*:'+this.config.publisherPort);
 	this.publisherSocket.bindSync('tcp://*:'+this.config.publisherPort);
 	
 	this.redis = Redis.createClient(this.config.redisPort, this.config.redisHost);
@@ -95,9 +95,9 @@ ESB.prototype.connect= function(){
 			});
 		}, 5000);
 
-		console.log('ESB Node %s connecting to: %s (%s)', self.guid, connectStr, self.proxyGuid);
+		//console.log('ESB Node %s connecting to: %s (%s)', self.guid, connectStr, self.proxyGuid);
 		self.requestSocket.connect(connectStr);
-		console.log('ESB Node %s connected', self.guid);
+		//console.log('ESB Node %s connected', self.guid);
 		self.sendHello();
 	});
 };
@@ -126,12 +126,12 @@ ESB.prototype.sendHello= function() {
 		}
 		var t = respObj.payload.toString().split('#');
 		t = 'tcp://'+t[0]+':'+t[1];
-		console.log('connecting to: '+t);
+		//console.log('connecting to: '+t);
 		self.subscribeSocket.on('message', function(data){
 			self.onMessage.call(self, data);
 		});
 		self.subscribeSocket.connect(t);
-		console.log('ESB Node %s connected to publisher of ESB Proxy %s', self.guid, self.proxyGuid);
+		//console.log('ESB Node %s connected to publisher of ESB Proxy %s', self.guid, self.proxyGuid);
 		self.subscribeSocket.subscribe(self.guid);
 		//self.proxyGuid = respObj.source_proxy_guid;
 		self.ready = true;
@@ -145,7 +145,7 @@ ESB.prototype.sendHello= function() {
 		}, 50);
 	});
 	this.requestSocket.send(buf);
-	console.log('NODE_HELLO sended');
+	console.log('NODE_HELLO sent');
 };
 
 ESB.prototype.ping = function(){
@@ -233,7 +233,7 @@ ESB.prototype.onMessage= function(data) {
 			this.publisherSocket.send(b);
 			break;
 		case 'ERROR':
-			console.log('got ERROR response: ', respObj.payload.toString());
+			console.log('driver got ERROR response from Proxy: ', respObj.payload.toString());
 			if(this.responseCallbacks[respObj.guid_to]){
 				var fn = this.responseCallbacks[respObj.guid_to];
 				fn(respObj.cmd, null, respObj.payload.toString());
@@ -241,6 +241,9 @@ ESB.prototype.onMessage= function(data) {
 			break;
 		case 'REGISTER_INVOKE_OK':
 			//console.log("REGISTER_INVOKE_OK for %s from Proxy %s", respObj.payload, respObj.source_proxy_guid);
+			break;
+		case 'PUBLISH':
+			this.emit('subscribe_'+respObj.identifier, JSON.parse(respObj.payload.toString()));
 			break;
 		default:
 			console.log("unknown operation", respObj);
@@ -333,7 +336,56 @@ ESB.prototype.sendPostQueue = function(){
 	}
 	this.sendQueue = [];
 	this.lastSend = +new Date;
-}
+};
+
+ESB.prototype.publish = function(identifier, data, options) {
+	options = extend(true, {
+		version: 1
+	}, options);
+	var obj = {
+		cmd: 'PUBLISH',
+		identifier: identifier+'/'+options.version,
+		payload: JSON.stringify(data),
+		source_proxy_guid: this.guid
+	};
+	var buf = pb.Serialize(obj, "ESB.Command");
+	var b = new Buffer(guidSize + 1 + buf.length);
+	b.write(this.proxyGuid, 'binary');
+	b.write('\t', guidSize, 1, 'binary');
+	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+	var now = +new Date;
+	if(now - this.lastSend < 3) {
+		this.sendQueue.push(b);
+	} else {
+		this.publisherSocket.send(b);
+		this.sendPostQueue();
+	}
+};
+
+ESB.prototype.subscribe = function(identifier, version, cb) {
+	identifier = identifier+'/'+version;
+	this.on('subscribe_'+identifier, cb);
+	this.subscribeSocket.subscribe(identifier);
+	
+	var obj = {
+		cmd: 'SUBSCRIBE',
+		identifier: identifier,
+		payload: 'please',
+		source_proxy_guid: this.guid
+	};
+	var buf = pb.Serialize(obj, "ESB.Command");
+	var b = new Buffer(guidSize + 1 + buf.length);
+	b.write(this.proxyGuid, 'binary');
+	b.write('\t', guidSize, 1, 'binary');
+	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+	var now = +new Date;
+	if(now - this.lastSend < 3) {
+		this.sendQueue.push(b);
+	} else {
+		this.publisherSocket.send(b);
+		this.sendPostQueue();
+	}
+};
 
 ESB.prototype.sendRegistry = function(){
 	if(!this.ready) return;
@@ -341,7 +393,7 @@ ESB.prototype.sendRegistry = function(){
 		var m = this.invokeMethods[g];
 		this.register(m.identifier, m.version, m.method, m.options, true);
 	}
-}
+};
 
 ESB.prototype.register = function(_identifier, version, cb, options, internalCall) {
 	if(!this.ready){
@@ -375,12 +427,12 @@ ESB.prototype.register = function(_identifier, version, cb, options, internalCal
 				//console.log('got response from method...', err, resp);
 				var obj = {
 					cmd: 'RESPONSE',
-					payload: JSON.stringify(resp, null, '\t'),
+					payload: JSON.stringify(resp),
 					guid_from: cmdGuid,
 					guid_to: data.guid_from,
 					//target_proxy_guid: self.proxyGuid,
 					source_proxy_guid: self.guid,
-					start_time: +new Date,
+					//start_time: +new Date,
 				}
 			
 				try {

@@ -79,6 +79,15 @@ Options may contain:
 * version - by default version is 1
 * timeout - in ms, by default 15000
 
+* ESB.publish(&lt;identifier>, &lt;data>[ ,options])
+
+Options may contain:
+
+* version - by default version is 1
+
+* ESB.subscribe(&lt;identifier>, &lt;version, &lt;callback>)
+
+
 Issues
 ===
 
