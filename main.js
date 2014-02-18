@@ -43,11 +43,12 @@ function ESB(config) {
 	this.publisherSocket = zmq.socket('pub');
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDBUF, 256*1024);
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDHWM, 5000);
+	this.publisherSocket.setsockopt(zmq.ZMQ_BACKLOG, 500);
 	this.publisherSocket.on('error', function(err){
 		console.log('publisherSocket error', err);
 		self.emit('error', err);
 	});
-	console.log('try to bind', 'tcp://*:'+this.config.publisherPort)
+	console.log('try to bind', 'tcp://*:'+this.config.publisherPort);
 	this.publisherSocket.bindSync('tcp://*:'+this.config.publisherPort);
 	
 	this.redis = Redis.createClient(this.config.redisPort, this.config.redisHost);
