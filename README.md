@@ -68,24 +68,24 @@ Check the examples directory.
 API
 ===
 
-* ESB.register(&lt;identifier>, &lt;version, &lt;callback>[ ,options])
+* ESB.register(&lt;identifier>, &lt;version>, &lt;callback>[ ,options])
 
-Currently is no options here
+	Currently is no options here
 
 * ESB.invoke(&lt;identifier>, &lt;data>, &lt;callback>[ ,options])
 
-Options may contain:
-
-* version - by default version is 1
-* timeout - in ms, by default 15000
+	Options may contain:
+	
+	* version - by default version is 1
+	* timeout - in ms, by default 15000
 
 * ESB.publish(&lt;identifier>, &lt;data>[ ,options])
+	
+	Options may contain:
 
-Options may contain:
+	* version - by default version is 1
 
-* version - by default version is 1
-
-* ESB.subscribe(&lt;identifier>, &lt;version, &lt;callback>)
+* ESB.subscribe(&lt;identifier>, &lt;version>, &lt;callback>)
 
 
 Issues
