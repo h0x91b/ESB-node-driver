@@ -1,6 +1,6 @@
 
-È
-src/command.protoESB"­
+Ê
+src/command.protoESB"¯
 Command
 cmd (2.ESB.Command.Cmd
 source_proxy_guid (	
@@ -9,8 +9,8 @@
 
 identifier (	
 	guid_from (	
-guid_to (	
-version (
+guid_to (	
+	recursion (
 
 start_time	 (
 
