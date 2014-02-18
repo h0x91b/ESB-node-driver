@@ -13,33 +13,26 @@ var _config = {
 	publisherHost: 'h0x91b.toyga.local',
 	publisherPort: 7780,
 	redisHost: 'esb-redis',
-	redisPort: 6379
+	redisPort: 6379,
+	proxyTimeout: 3000,
+	retryConnectionTime: 1000
 };
 
 function ESB(config) {
 	events.EventEmitter.call(this);
 	this.config = extend(true, {}, _config, config);
-	this.guid = genGuid();
 	this.proxyGuid = '';
 	this.ready = false;
+	this.wasready = false;
+	this.connecting = false;
+	this.guid = genGuid();
 	console.log('new ESB driver %s', this.guid);
 	this.responseCallbacks = [];
 	this.invokeMethods = [];
+	this.subscribeChannels = {};
 	this.sendQueue = [];
 	this.lastSend = +new Date;
-	var socket = zmq.socket('req');
 	var self = this;
-	this.requestSocket = socket;
-	this.requestSocket.on('error', function(err){
-		console.log('requestSocket error', err);
-		self.emit('error', err);
-	});
-	this.subscribeSocket = zmq.socket('sub');
-	this.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
-	this.subscribeSocket.on('error', function(err){
-		console.log('subscribeSocket error', err);
-		self.emit('error', err);
-	});
 	this.publisherSocket = zmq.socket('pub');
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDBUF, 256*1024);
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDHWM, 5000);
@@ -51,10 +44,19 @@ function ESB(config) {
 	//console.log('try to bind', 'tcp://*:'+this.config.publisherPort);
 	this.publisherSocket.bindSync('tcp://*:'+this.config.publisherPort);
 	
+	//Redis.debug_mode = true;
 	this.redis = Redis.createClient(this.config.redisPort, this.config.redisHost);
 	this.redis.on('error', function(err){
 		console.log('redis error', err);
 		self.emit('error', err);
+	});
+	
+	this.redis.on('connect', function(){
+		console.log('redis client connected');
+	});
+	
+	this.redis.on('reconnecting', function(){
+		console.log('redis client reconnecting');
 	});
 	
 	this.connect();
@@ -63,39 +65,74 @@ function ESB(config) {
 util.inherits(ESB, events.EventEmitter);
 
 ESB.prototype.connect= function(){
+	if(this.ready || this.connecting) return;
+	this.connecting = true;
 	var self = this;
-	this.redis.zrevrange('ZSET:PROXIES','0', '0', function(err, resp){
+	
+	this.redis.zrevrange('ZSET:PROXIES', '0', '0', function(err, resp){
 		if(err){
 			console.log('Cannot get data from registry', err);
 			self.emit('error', err);
+			self.connecting = false;
 			return;
 		}
 		if(resp.length<1){
-			console.log('currently no proxies can be found, wait 1 sec');
+			console.log('currently no proxies can be found, wait %s ms', self.config.retryConnectionTime);
 			setTimeout(function(){
 				self.connect();
-			}, 1000);
+			}, self.config.retryConnectionTime);
+			self.connecting = false;
 			return;
 		}
 		var id = null;
 		var entry = resp.pop();
 		var d = entry.split('#');
 		var connectStr = d[1];
-		self.proxyGuid = d[0];
+		//self.proxyGuid = d[0];
+		
+		if(self.requestSocket){
+			console.log("disconnect requestSocket from %s", connectStr);
+			self.requestSocket.disconnect(connectStr);
+			self.requestSocket = null;
+		}
+		self.requestSocket = zmq.socket('req');
+		self.requestSocket.on('error', function(err){
+			console.log('requestSocket error', err);
+			self.emit('error', err);
+		});
+		
+		if(self.subscribeSocket){
+			console.log("disconnect subscribeSocket from %s", self.subscribeSocket.__connectStr);
+			self.subscribeSocket.disconnect(self.subscribeSocket.__connectStr);
+			self.subscribeSocket = null;
+		}
+	
+		self.subscribeSocket = zmq.socket('sub');
+		self.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
+		self.subscribeSocket.subscribe(self.guid);
+		for(var c in self.subscribeChannels){
+			self.subscribeSocket.subscribe(c);
+		}
+
+		self.subscribeSocket.on('error', function(err){
+			console.log('subscribeSocket error', err);
+			self.emit('error', err);
+		});
 		
 		setTimeout(function(){
 			if(self.ready) return;
 			console.log('connection failed to %s, remove entry from redis and try again', entry);
 			self.redis.zrem('ZSET:PROXIES', entry, function(err, resp){
-				try {
-					self.requestSocket.disconnect();
-					self.subscribeSocket.disconnect();
-				} catch(e){}
+				if(err) {
+					console.log('error on zrem', err);
+				}
+				self.connecting = false;
 				self.connect();
 			});
-		}, 5000);
+		}, self.config.proxyTimeout);
 
 		//console.log('ESB Node %s connecting to: %s (%s)', self.guid, connectStr, self.proxyGuid);
+		self.requestSocket.__connectStr = connectStr;
 		self.requestSocket.connect(connectStr);
 		//console.log('ESB Node %s connected', self.guid);
 		self.sendHello();
@@ -115,10 +152,10 @@ ESB.prototype.sendHello= function() {
 	var buf = pb.Serialize(obj, "ESB.Command");
 	var self = this;
 	this.requestSocket.once('message', function(data){
-		try
-		{
-			self.requestSocket.close();
-		} catch(e){};
+		self.connecting = false;
+		if(self.requestSocket)
+			self.requestSocket.disconnect(self.requestSocket.__connectStr);
+		self.requestSocket = null;
 		var respObj = pb.Parse(data, "ESB.Command");
 		console.log('got response from Proxy', respObj.payload.toString());
 		if(respObj.cmd === 'ERROR') {
@@ -126,37 +163,53 @@ ESB.prototype.sendHello= function() {
 		}
 		var t = respObj.payload.toString().split('#');
 		t = 'tcp://'+t[0]+':'+t[1];
-		//console.log('connecting to: '+t);
+		self.subscribeSocket.__connectStr = t;
 		self.subscribeSocket.on('message', function(data){
 			self.onMessage.call(self, data);
 		});
+		
 		self.subscribeSocket.connect(t);
-		//console.log('ESB Node %s connected to publisher of ESB Proxy %s', self.guid, self.proxyGuid);
-		self.subscribeSocket.subscribe(self.guid);
-		//self.proxyGuid = respObj.source_proxy_guid;
+
 		self.ready = true;
-		self.emit('ready');
-		setInterval(function(){
-			self.sendRegistry();
-			self.ping();
-		}, 1000);
-		setInterval(function(){
-			self.sendPostQueue();
-		}, 50);
+		console.log('connected successfully to %s %s', self.subscribeSocket.__connectStr, respObj.source_proxy_guid);
+		self.proxyGuid = respObj.source_proxy_guid;
+		if(self.wasready === false){
+			self.emit('ready');
+			self.wasready = true;
+		}
+		
+		if(!self.intervalsSetedOn) {
+			setInterval(function(){
+				self.sendRegistry();
+				self.redis.ping(function(err, resp){
+					if(err) {
+						console.log('error while pinging redis', err);
+					}
+				});
+			}, 1000);
+			setInterval(function(){
+				self.ping();
+			}, self.config.proxyTimeout);
+			setInterval(function(){
+				self.sendPostQueue();
+			}, 50);
+			self.intervalsSetedOn = true;
+		}
 	});
 	this.requestSocket.send(buf);
-	console.log('NODE_HELLO sent');
+	//console.log('NODE_HELLO sent');
 };
 
 ESB.prototype.ping = function(){
 	//console.log('send ping to %s', this.guid, this.proxyGuid);
-	if(!this.ready) return;
+	if(!this.ready || this.connecting) return;
 	var cmdGuid = genGuid();
+	var guid = this.guid;
 	var obj = {
 		cmd: 'PING',
 		payload: 'hi',
 		guid_from: cmdGuid,
-		source_proxy_guid: this.guid,
+		source_proxy_guid: guid,
 		//target_proxy_guid: ''
 	}
 	var buf = pb.Serialize(obj, "ESB.Command");
@@ -164,18 +217,19 @@ ESB.prototype.ping = function(){
 	var self = this;
 	
 	function timeout(){
-		console.log('proxy timeout!');
+		console.log('ESB-node-driver get timeout on PING request, reconnect to another proxy');
 		if(self.ready){
 			self.ready = false;
 			self.emit('disconnected');
+			self.connect();
 		}
 		delete self.responseCallbacks[cmdGuid];
 	}
 	
-	id = setTimeout(timeout, 3000);
+	id = setTimeout(timeout, this.config.proxyTimeout);
 	
 	this.responseCallbacks[cmdGuid] = function(err, data, errString){
-		//console.log('pong');
+		//console.log('pong %s', cmdGuid);
 		self.ready = true;
 		if(id) clearTimeout(id);
 		delete self.responseCallbacks[cmdGuid];
@@ -192,6 +246,8 @@ ESB.prototype.ping = function(){
 ESB.prototype.onMessage= function(data) {
 	try {
 		//console.log('ESB.prototype.onMessage', data);
+		var channel = data.slice(0, data.toString('utf-8').indexOf('\t'));
+		//console.log('==========[ channel "%s" ]===========', channel);
 		data = data.slice(data.toString('utf-8').indexOf('\t')+1);
 		var respObj = pb.Parse(data, "ESB.Command");
 		//console.log('suscriber got message: ', respObj);
@@ -213,7 +269,7 @@ ESB.prototype.onMessage= function(data) {
 				delete this.responseCallbacks[respObj.guid_to];
 				fn(null, JSON.parse(respObj.payload.toString()), null);
 			} else {
-				console.log('callback %s for response not found', respObj.guid_to);
+				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
 			}
 			break;
 		case 'PING':
@@ -339,6 +395,7 @@ ESB.prototype.sendPostQueue = function(){
 };
 
 ESB.prototype.publish = function(identifier, data, options) {
+	if(!this.ready) return;
 	options = extend(true, {
 		version: 1
 	}, options);
@@ -365,7 +422,11 @@ ESB.prototype.publish = function(identifier, data, options) {
 ESB.prototype.subscribe = function(identifier, version, cb) {
 	identifier = identifier+'/'+version;
 	this.on('subscribe_'+identifier, cb);
-	this.subscribeSocket.subscribe(identifier);
+	if(!(identifier in this.subscribeChannels))
+		this.subscribeSocket.subscribe(identifier);
+	this.subscribeChannels[identifier] = 1;
+	
+	if(!this.ready) return;
 	
 	var obj = {
 		cmd: 'SUBSCRIBE',

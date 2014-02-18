@@ -16,8 +16,6 @@ You will need a redis server, place his ip into /etc/hosts as domain `esb-redis`
 Usage
 ===
 
-Check the examples directory.
-
 	var ESB = require('esb-node-driver');
 	
 	var esb = new ESB({
@@ -50,6 +48,11 @@ Check the examples directory.
 			cb(null, data.a + data.b);
 		});
 		
+		//pubsub :)
+		esb.subscribe('/hello', 1, function(data){
+			console.log('get message on channel /hello', data);
+		});
+		
 		setInterval(function(){
 			
 			//lets invoke method above every second
@@ -61,6 +64,9 @@ Check the examples directory.
 				console.assert(resp == 5);
 				console.log('2+3=%s', resp);
 			});
+			
+			//publish something
+			esb.publish('/hello', {foo:'bar', rand: Math.random()});
 			
 		}, 1000);
 	});
