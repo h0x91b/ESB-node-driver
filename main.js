@@ -264,6 +264,17 @@ ESB.prototype.onMessage= function(data) {
 			}
 			fn(respObj);
 			break;
+		case 'ERROR_RESPONSE':
+			//console.log('got ERROR_RESPONSE', respObj);
+			var fn = this.responseCallbacks[respObj.guid_to];
+			if(fn){
+				delete this.responseCallbacks[respObj.guid_to];
+				fn('ERROR_RESPONSE', null, JSON.parse(respObj.payload.toString()));
+			} else {
+				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
+			}
+			break;
+			
 		case 'RESPONSE':
 			//console.log('got RESPONSE', respObj);
 			var fn = this.responseCallbacks[respObj.guid_to];
@@ -500,8 +511,8 @@ ESB.prototype.register = function(_identifier, version, cb, options, internalCal
 			
 				try {
 					if(err) {
-						obj.cmd = 'ERROR';
-						obj.payload = err;
+						obj.cmd = 'ERROR_RESPONSE';
+						obj.payload = JSON.stringify(err);
 					}
 					//console.log('invoke method send response',obj);
 					var buf = pb.Serialize(obj, "ESB.Command");

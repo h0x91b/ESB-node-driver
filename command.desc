@@ -1,6 +1,6 @@
 
-Ê
-src/command.protoESB"¯
+Þ
+src/command.protoESB"Ã
 Command
 cmd (2.ESB.Command.Cmd
 source_proxy_guid (	
@@ -23,23 +23,24 @@ timeout_ms
 identifier (	
 method_guid (	
 
-proxy_guid (	"ç
+proxy_guid (	"û
 Cmd	
 ERROR
-RESPONSE
+RESPONSE
+ERROR_RESPONSE
 
-NODE_HELLO
-PROXY_HELLO
-PING
-PONG
+NODE_HELLO
+PROXY_HELLO
+PING
+PONG
 
-INVOKE
-REGISTER_INVOKE
-REGISTER_INVOKE_OK	
-REGISTRY_EXCHANGE_REQUEST
-
-REGISTRY_EXCHANGE_RESPONSE
-PUBLISH
-	SUBSCRIBE"&
+INVOKE
+REGISTER_INVOKE	
+REGISTER_INVOKE_OK
+
+REGISTRY_EXCHANGE_REQUEST
+REGISTRY_EXCHANGE_RESPONSE
+PUBLISH
+	SUBSCRIBE"&
 RegistryEntryType
 INVOKE_METHOD
