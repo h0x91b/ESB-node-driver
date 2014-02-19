@@ -13,14 +13,15 @@ esb.on('error', function(err){
 
 esb.on('ready', function(){
 	console.log('ESB ready for use');
-	
 	esb.register('/math/plus', 1, function(data, cb){
 		console.log('/math/plus cb #1 is invoked', data);
 		cb(null, data.a + data.b);
 	});
 	
 	esb.register('/math/plus', 1, function(data, cb){
-		console.log('/math/plus cb #2 is invoked', data);
-		cb(null, data.a + data.b);
+		console.log('/math/plus cb #2 is invoked, delayed answer', data);
+		setTimeout(function(){
+			cb(null, data.a + data.b);
+		}, 1000);
 	});
 });

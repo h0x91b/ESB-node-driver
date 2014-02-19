@@ -35,7 +35,7 @@ esb.on('ready', function(){
 					if(maxtime<time) maxtime = time;
 					if(time<mintime) mintime = time;
 				}, {
-					timeout: 0
+					timeout: 15000
 				});
 			})();
 		}

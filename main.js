@@ -27,7 +27,7 @@ function ESB(config) {
 	this.connecting = false;
 	this.guid = genGuid();
 	console.log('new ESB driver %s', this.guid);
-	this.responseCallbacks = [];
+	this.responseCallbacks = {};
 	this.invokeMethods = [];
 	this.subscribeChannels = {};
 	this.sendQueue = [];
@@ -102,8 +102,10 @@ ESB.prototype.connect= function(){
 		});
 		
 		if(self.subscribeSocket){
-			console.log("disconnect subscribeSocket from %s", self.subscribeSocket.__connectStr);
-			self.subscribeSocket.disconnect(self.subscribeSocket.__connectStr);
+			if(self.subscribeSocket.__connectStr) {
+				console.log("disconnect subscribeSocket from %s", self.subscribeSocket.__connectStr);
+				self.subscribeSocket.disconnect(self.subscribeSocket.__connectStr);
+			}
 			self.subscribeSocket = null;
 		}
 	
