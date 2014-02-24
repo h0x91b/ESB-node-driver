@@ -29,5 +29,5 @@ esb1.on('ready', function(){
 });
 
 esb1.on('disconnected', function(){
-	process.exit();
+	//process.exit();
 });

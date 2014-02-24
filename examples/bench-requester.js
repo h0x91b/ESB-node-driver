@@ -61,6 +61,6 @@ esb.on('ready', function(){
 });
 
 esb.on('disconnected', function(){
-	process.exit();
+	//process.exit();
 });
 

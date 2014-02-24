@@ -159,12 +159,12 @@ ESB.prototype.sendHello= function() {
 			self.requestSocket.disconnect(self.requestSocket.__connectStr);
 		self.requestSocket = null;
 		var respObj = pb.Parse(data, "ESB.Command");
-		console.log('got response from Proxy', respObj.payload.toString());
 		if(respObj.cmd === 'ERROR') {
 			throw new Error(respObj.payload.toString());
 		}
 		var t = respObj.payload.toString().split('#');
 		t = 'tcp://'+t[0]+':'+t[1];
+		console.log('got response from Proxy', respObj.payload.toString(), t);
 		self.subscribeSocket.__connectStr = t;
 		self.subscribeSocket.on('message', function(data){
 			self.onMessage.call(self, data);
