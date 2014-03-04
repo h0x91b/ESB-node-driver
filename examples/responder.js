@@ -19,9 +19,14 @@ esb.on('ready', function(){
 	});
 	
 	esb.register('/math/plus', 1, function(data, cb){
-		console.log('/math/plus cb #2 is invoked, delayed answer', data);
+		console.log('/math/plus cb #2 simulate service error', data);
+		cb('Sorry dude', null);
+	});
+	
+	esb.register('/math/plus', 1, function(data, cb){
+		console.log('/math/plus cb #3 simulate timeout', data);
 		setTimeout(function(){
 			cb(null, data.a + data.b);
-		}, 1000);
+		}, 1500);
 	});
 });

@@ -6,11 +6,11 @@ var pb = new proto(fs.readFileSync(__dirname+"/command.desc"));
 var util = require("util");
 var events = require("events");
 var Redis = require('redis');
+var net = require('net');
 
 var guidSize = 16;
 
 var _config = {
-	publisherHost: 'h0x91b.toyga.local',
 	publisherPort: 7780,
 	redisHost: 'esb-redis',
 	redisPort: 6379,
@@ -88,14 +88,17 @@ ESB.prototype.connect= function(){
 		var entry = resp.pop();
 		var d = entry.split('#');
 		var connectStr = d[1];
-		//self.proxyGuid = d[0];
+		self.proxyGuid = d[0];
 		
 		if(self.requestSocket){
 			console.log("disconnect requestSocket from %s", connectStr);
-			self.requestSocket.disconnect(connectStr);
+			self.requestSocket.destroy();
 			self.requestSocket = null;
 		}
-		self.requestSocket = zmq.socket('req');
+		self.requestSocket = new net.Socket({
+			readable: true,
+			writable: true
+		});
 		self.requestSocket.on('error', function(err){
 			console.log('requestSocket error', err);
 			self.emit('error', err);
@@ -132,74 +135,61 @@ ESB.prototype.connect= function(){
 				self.connect();
 			});
 		}, self.config.proxyTimeout);
-
-		//console.log('ESB Node %s connecting to: %s (%s)', self.guid, connectStr, self.proxyGuid);
-		self.requestSocket.__connectStr = connectStr;
-		self.requestSocket.connect(connectStr);
-		//console.log('ESB Node %s connected', self.guid);
-		self.sendHello();
-	});
-};
-
-ESB.prototype.sendHello= function() {
-	var cmdGuid = genGuid();
-	
-	var obj = {
-		cmd: 'NODE_HELLO',
-		payload: this.guid+'#tcp://'+this.config.publisherHost+':'+this.config.publisherPort,
-		guid_from: cmdGuid,
-		source_proxy_guid: this.guid,
-		//target_proxy_guid: ''
-	}
-	var buf = pb.Serialize(obj, "ESB.Command");
-	var self = this;
-	this.requestSocket.once('message', function(data){
-		self.connecting = false;
-		if(self.requestSocket)
-			self.requestSocket.disconnect(self.requestSocket.__connectStr);
-		self.requestSocket = null;
-		var respObj = pb.Parse(data, "ESB.Command");
-		if(respObj.cmd === 'ERROR') {
-			throw new Error(respObj.payload.toString());
-		}
-		var t = respObj.payload.toString().split('#');
-		t = 'tcp://'+t[0]+':'+t[1];
-		console.log('got response from Proxy', respObj.payload.toString(), t);
-		self.subscribeSocket.__connectStr = t;
-		self.subscribeSocket.on('message', function(data){
-			self.onMessage.call(self, data);
+		
+		console.log('connectStr', connectStr);
+		var host = connectStr.split(':')[0];
+		var port = connectStr.split(':')[1];
+		console.log({host: host, port: port});
+		console.log('ESB Node %s connecting to: %s:%s (%s)', self.guid, host, port, self.proxyGuid);
+		self.requestSocket.connect(port, host, function(){
+			console.log('connected, send my publishers port', self.config.publisherPort);
+			self.requestSocket.write(self.config.publisherPort+'#'+self.guid);
 		});
 		
-		self.subscribeSocket.connect(t);
-
-		self.ready = true;
-		console.log('connected successfully to %s %s', self.subscribeSocket.__connectStr, respObj.source_proxy_guid);
-		self.proxyGuid = respObj.source_proxy_guid;
-		if(self.wasready === false){
-			self.emit('ready');
-			self.wasready = true;
-		}
+		self.requestSocket.once('data', function(data){
+			console.log('requestSocket get data', data.toString());
+			self.requestSocket.destroy();
+			self.requestSocket = null;
+			
+			var t = 'tcp://'+host+':'+data.toString();
+			console.log('got response from Proxy, builded connectionString is', t);
+			self.subscribeSocket.__connectStr = t;
+			self.subscribeSocket.on('message', function(data){
+				self.onMessage.call(self, data);
+			});
 		
-		if(!self.intervalsSetedOn) {
-			setInterval(function(){
-				self.sendRegistry();
-				self.redis.ping(function(err, resp){
-					if(err) {
-						console.log('error while pinging redis', err);
-					}
-				});
-			}, 1000);
-			setInterval(function(){
-				self.ping();
-			}, self.config.proxyTimeout);
-			setInterval(function(){
-				self.sendPostQueue();
-			}, 50);
-			self.intervalsSetedOn = true;
-		}
+			self.subscribeSocket.connect(t);
+
+			self.ready = true;
+			console.log('connected successfully to %s %s', self.subscribeSocket.__connectStr, self.proxyGuid);
+	
+			if(self.wasready === false){
+				self.emit('ready');
+				self.wasready = true;
+			}
+		
+			if(!self.intervalsSetedOn) {
+				setInterval(function(){
+					self.sendRegistry();
+					self.redis.ping(function(err, resp){
+						if(err) {
+							console.log('error while pinging redis', err);
+						}
+					});
+				}, 1000);
+				setInterval(function(){
+					self.ping();
+				}, self.config.proxyTimeout);
+				setInterval(function(){
+					self.sendPostQueue();
+				}, 50);
+				self.intervalsSetedOn = true;
+			}
+		});
+		// self.requestSocket.connect(connectStr);
+		//console.log('ESB Node %s connected', self.guid);
+		// self.sendHello();
 	});
-	this.requestSocket.send(buf);
-	//console.log('NODE_HELLO sent');
 };
 
 ESB.prototype.ping = function(){
