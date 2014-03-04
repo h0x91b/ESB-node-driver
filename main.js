@@ -142,6 +142,7 @@ ESB.prototype.connect= function(){
 		console.log({host: host, port: port});
 		console.log('ESB Node %s connecting to: %s:%s (%s)', self.guid, host, port, self.proxyGuid);
 		self.requestSocket.connect(port, host, function(){
+			self.connecting = false;
 			console.log('connected, send my publishers port', self.config.publisherPort);
 			self.requestSocket.write(self.config.publisherPort+'#'+self.guid);
 		});
@@ -193,7 +194,7 @@ ESB.prototype.connect= function(){
 };
 
 ESB.prototype.ping = function(){
-	//console.log('send ping to %s', this.guid, this.proxyGuid);
+	// console.log('send ping to %s', this.guid, this.proxyGuid);
 	if(!this.ready || this.connecting) return;
 	var cmdGuid = genGuid();
 	var guid = this.guid;
