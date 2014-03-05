@@ -15,10 +15,21 @@ esb.on('ready', function(){
 	console.log('ESB ready for use');
 	
 	esb.subscribe('/hello', 1, function(data){
-		console.log('get message on channel /hello', data);
+		console.log('got message on channel /hello', data);
+	});
+	
+	esb.subscribe('/hellohello', 1, function(data){
+		console.log('got message on channel /hellohello', data);
+	});
+	
+	esb.subscribe('/hellohellohello', 1, function(data){
+		console.log('got message on channel /hellohellohello', data);
 	});
 	
 	setInterval(function(){
+		console.log(Array(20).join('='));
 		esb.publish('/hello', {foo:'bar', rand: Math.random()});
-	}, 1000);
+		esb.publish('/hellohello', {foo:'baz', rand: Math.random()});
+		esb.publish('/hellohellohello', {foo:'boo', rand: Math.random()});
+	}, 5000);
 });

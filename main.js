@@ -116,7 +116,28 @@ ESB.prototype.connect= function(){
 		self.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
 		self.subscribeSocket.subscribe(self.guid);
 		for(var c in self.subscribeChannels){
+			console.log('re-subscribe on channel `%s`', c);
 			self.subscribeSocket.subscribe(c);
+			(function(identifier){
+				var obj = {
+					cmd: 'SUBSCRIBE',
+					identifier: identifier,
+					payload: 'please',
+					source_proxy_guid: self.guid
+				};
+				var buf = pb.Serialize(obj, "ESB.Command");
+				var b = new Buffer(guidSize + 1 + buf.length);
+				b.write(self.proxyGuid, 'binary');
+				b.write('\t', guidSize, 1, 'binary');
+				b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+				var now = +new Date;
+				if(now - self.lastSend < 3) {
+					self.sendQueue.push(b);
+				} else {
+					self.publisherSocket.send(b);
+					self.sendPostQueue();
+				}
+			})(c);
 		}
 
 		self.subscribeSocket.on('error', function(err){
@@ -265,7 +286,7 @@ ESB.prototype.onMessage= function(data) {
 				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
 			}
 			break;
-			
+		case 'PONG':
 		case 'RESPONSE':
 			//console.log('got RESPONSE', respObj);
 			var fn = this.responseCallbacks[respObj.guid_to];
@@ -277,8 +298,7 @@ ESB.prototype.onMessage= function(data) {
 			}
 			break;
 		case 'PING':
-			console.log('got PING request');
-			//
+			// console.log('got PING request');
 			var obj = {
 				cmd: 'PONG',
 				payload: +new Date,
@@ -405,7 +425,7 @@ ESB.prototype.publish = function(identifier, data, options) {
 	}, options);
 	var obj = {
 		cmd: 'PUBLISH',
-		identifier: identifier+'/'+options.version,
+		identifier: identifier+'/v'+options.version,
 		payload: JSON.stringify(data),
 		source_proxy_guid: this.guid
 	};
@@ -424,7 +444,7 @@ ESB.prototype.publish = function(identifier, data, options) {
 };
 
 ESB.prototype.subscribe = function(identifier, version, cb) {
-	identifier = identifier+'/'+version;
+	identifier = identifier+'/v'+version;
 	this.on('subscribe_'+identifier, cb);
 	if(!(identifier in this.subscribeChannels))
 		this.subscribeSocket.subscribe(identifier);
