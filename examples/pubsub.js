@@ -14,16 +14,16 @@ esb.on('error', function(err){
 esb.on('ready', function(){
 	console.log('ESB ready for use');
 	
-	esb.subscribe('/hello', 1, function(data){
-		console.log('got message on channel /hello', data);
+	esb.subscribe('/hello', function(channel, data){
+		console.log('got message on channel %s', channel, data);
 	});
 	
-	esb.subscribe('/hellohello', 1, function(data){
-		console.log('got message on channel /hellohello', data);
+	esb.subscribe('/hellohello', function(channel, data){
+		console.log('got message on channel %s', channel, data);
 	});
 	
-	esb.subscribe('/hellohellohello', 1, function(data){
-		console.log('got message on channel /hellohellohello', data);
+	esb.subscribe('/hellohellohello', function(channel, data){
+		console.log('got message on channel %s', channel, data);
 	});
 	
 	setInterval(function(){
@@ -31,5 +31,5 @@ esb.on('ready', function(){
 		esb.publish('/hello', {foo:'bar', rand: Math.random()});
 		esb.publish('/hellohello', {foo:'baz', rand: Math.random()});
 		esb.publish('/hellohellohello', {foo:'boo', rand: Math.random()});
-	}, 5000);
+	}, 3000);
 });

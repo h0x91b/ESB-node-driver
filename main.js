@@ -323,7 +323,10 @@ ESB.prototype.onMessage= function(data) {
 			//console.log("REGISTER_INVOKE_OK for %s from Proxy %s", respObj.payload, respObj.source_proxy_guid);
 			break;
 		case 'PUBLISH':
-			this.emit('subscribe_'+respObj.identifier, JSON.parse(respObj.payload.toString()));
+			this.emit('subscribe_'+respObj.identifier, {
+				channel: channel, 
+				data:JSON.parse(respObj.payload.toString()
+			)});
 			break;
 		default:
 			console.log("unknown operation", respObj);
@@ -425,7 +428,7 @@ ESB.prototype.publish = function(identifier, data, options) {
 	}, options);
 	var obj = {
 		cmd: 'PUBLISH',
-		identifier: identifier+'/v'+options.version,
+		identifier: identifier,
 		payload: JSON.stringify(data),
 		source_proxy_guid: this.guid
 	};
@@ -443,9 +446,10 @@ ESB.prototype.publish = function(identifier, data, options) {
 	}
 };
 
-ESB.prototype.subscribe = function(identifier, version, cb) {
-	identifier = identifier+'/v'+version;
-	this.on('subscribe_'+identifier, cb);
+ESB.prototype.subscribe = function(identifier, cb) {
+	this.on('subscribe_'+identifier, function(obj){
+		cb(obj.channel, obj.data);
+	});
 	if(!(identifier in this.subscribeChannels))
 		this.subscribeSocket.subscribe(identifier);
 	this.subscribeChannels[identifier] = 1;
