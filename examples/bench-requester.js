@@ -8,8 +8,7 @@ var starttime = +new Date;
 
 
 var esb = new ESB({
-	publisherHost: process.argv[2] || 'h0x91b.toyga.local', //your hostname needed for back connect from ESB proxy
-	publisherPort: process.argv[3] || 7790,
+	publisherPort: process.argv[2] || 7790,
 	redisHost: 'esb-redis', //Host with registry used by esb, place it in /etc/hosts
 	redisPort: 6379
 });
