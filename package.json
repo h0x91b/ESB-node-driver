@@ -1,6 +1,6 @@
 {
   "name": "esb-node-driver",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Driver for ESB (Connector)",
   "main": "main.js",
   "directories": {
