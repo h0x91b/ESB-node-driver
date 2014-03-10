@@ -64,12 +64,41 @@ function ESB(config) {
 
 util.inherits(ESB, events.EventEmitter);
 
+ESB.prototype.resubscribe = function(){
+	var self = this;
+	for(var c in self.subscribeChannels){
+		console.log('re-subscribe on channel `%s`', c);
+		self.subscribeSocket.subscribe(c);
+		(function(identifier){
+			var obj = {
+				cmd: 'SUBSCRIBE',
+				identifier: identifier,
+				payload: 'please',
+				source_proxy_guid: self.guid
+			};
+			var buf = pb.Serialize(obj, "ESB.Command");
+			var b = new Buffer(guidSize + 1 + buf.length);
+			b.write(self.proxyGuid, 'binary');
+			b.write('\t', guidSize, 1, 'binary');
+			b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+			var now = +new Date;
+			if(now - self.lastSend < 3) {
+				self.sendQueue.push(b);
+			} else {
+				self.publisherSocket.send(b);
+				self.sendPostQueue();
+			}
+		})(c);
+	}
+};
+
 ESB.prototype.connect= function(){
 	if(this.ready || this.connecting) return;
 	this.connecting = true;
 	var self = this;
 	
-	this.redis.zrevrange('ZSET:PROXIES', '0', '0', function(err, resp){
+	this.redis.zrevrange('ZSET:PROXIES', '0', '-1', function(err, resp){
+		console.log(resp);
 		if(err){
 			console.log('Cannot get data from registry', err);
 			self.emit('error', err);
@@ -85,7 +114,7 @@ ESB.prototype.connect= function(){
 			return;
 		}
 		var id = null;
-		var entry = resp.pop();
+		var entry = resp[Math.floor(Math.random()*resp.length)];
 		var d = entry.split('#');
 		var connectStr = d[1];
 		self.proxyGuid = d[0];
@@ -115,30 +144,7 @@ ESB.prototype.connect= function(){
 		self.subscribeSocket = zmq.socket('sub');
 		self.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
 		self.subscribeSocket.subscribe(self.guid);
-		for(var c in self.subscribeChannels){
-			console.log('re-subscribe on channel `%s`', c);
-			self.subscribeSocket.subscribe(c);
-			(function(identifier){
-				var obj = {
-					cmd: 'SUBSCRIBE',
-					identifier: identifier,
-					payload: 'please',
-					source_proxy_guid: self.guid
-				};
-				var buf = pb.Serialize(obj, "ESB.Command");
-				var b = new Buffer(guidSize + 1 + buf.length);
-				b.write(self.proxyGuid, 'binary');
-				b.write('\t', guidSize, 1, 'binary');
-				b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-				var now = +new Date;
-				if(now - self.lastSend < 3) {
-					self.sendQueue.push(b);
-				} else {
-					self.publisherSocket.send(b);
-					self.sendPostQueue();
-				}
-			})(c);
-		}
+		self.resubscribe();
 
 		self.subscribeSocket.on('error', function(err){
 			console.log('subscribeSocket error', err);
@@ -184,6 +190,7 @@ ESB.prototype.connect= function(){
 
 			self.ready = true;
 			console.log('connected successfully to %s %s', self.subscribeSocket.__connectStr, self.proxyGuid);
+			self.resubscribe();
 	
 			if(self.wasready === false){
 				self.emit('ready');
@@ -281,7 +288,7 @@ ESB.prototype.onMessage= function(data) {
 			var fn = this.responseCallbacks[respObj.guid_to];
 			if(fn){
 				delete this.responseCallbacks[respObj.guid_to];
-				fn('ERROR_RESPONSE', null, JSON.parse(respObj.payload.toString()));
+				fn('ERROR_RESPONSE', null, respObj.payload.toString());
 			} else {
 				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
 			}
@@ -344,7 +351,7 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 	}
 	options = extend(true, {
 		version: 1,
-		timeout: 15000
+		timeout: 30000
 	}, options);
 	identifier = identifier+'/v'+options.version;
 	//console.log('invoke()', identifier, options, data);
