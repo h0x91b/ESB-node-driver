@@ -14,7 +14,7 @@ esb.on('ready', function(){
 	console.log('ESB ready for use');
 	
 	setInterval(function(){
-		console.log(Array(20).join('=') + 'PUBLISH');
+		console.log(Array(20).join('=') + '[PUBLISH]' + Array(20).join('='));
 		esb.publish('/hello', {foo:'bar', rand: Math.random()});
 		esb.publish('/hellohello', {foo:'baz', rand: Math.random()});
 		esb.publish('/hellohellohello', {foo:'boo', rand: Math.random()});

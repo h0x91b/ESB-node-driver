@@ -14,7 +14,7 @@ var _config = {
 	publisherPort: 7780,
 	redisHost: 'esb-redis',
 	redisPort: 6379,
-	proxyTimeout: 3000,
+	proxyTimeout: 10000,
 	retryConnectionTime: 1000
 };
 
@@ -67,7 +67,7 @@ util.inherits(ESB, events.EventEmitter);
 ESB.prototype.resubscribe = function(){
 	var self = this;
 	for(var c in self.subscribeChannels){
-		console.log('re-subscribe on channel `%s`', c);
+		//console.log('re-subscribe on channel `%s`', c);
 		self.subscribeSocket.subscribe(c);
 		(function(identifier){
 			var obj = {
@@ -205,6 +205,7 @@ ESB.prototype.connect= function(){
 							console.log('error while pinging redis', err);
 						}
 					});
+					self.resubscribe();
 				}, 1000);
 				setInterval(function(){
 					self.ping();
