@@ -2,7 +2,7 @@ var ESB = require('../'); //in your case require('esb-node-driver');
 
 var esb = new ESB({
 	publisherPort: process.argv[2] || 7786,
-	redisHost: 'esb-redis', //Host with registry used by esb, place it in /etc/hosts
+	redisHost: 'plt-esbredis01', //Host with registry used by esb, place it in /etc/hosts
 	redisPort: 6379
 });
 

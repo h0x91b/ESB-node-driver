@@ -12,7 +12,7 @@ var guidSize = 16;
 
 var _config = {
 	publisherPort: 7780,
-	redisHost: 'esb-redis',
+	redisHost: 'plt-esbredis01',
 	redisPort: 6379,
 	proxyTimeout: 10000,
 	retryConnectionTime: 1000
