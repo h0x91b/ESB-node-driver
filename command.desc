@@ -1,46 +1,49 @@
 
-ﬁ
-src/command.protoESB"√
+¥
+command.protoESB"ù
 Command
-cmd (2.ESB.Command.Cmd
-source_proxy_guid (	
-payload (
-target_proxy_guid (	
+cmd (2.ESB.Command.Cmd
+source_component_guid (	
+payload (
+target_component_guid (	
 
-identifier (	
-	guid_from (	
-guid_to (	
-	recursion (
-
-start_time	 (
-
-timeout_ms
- (-
-	reg_entry (2.ESB.Command.RegistryEntryâ
+identifier (	
+source_operation_guid (	
+target_operation_guid (	
+	recursion (-
+	reg_entry	 (2.ESB.Command.RegistryEntryù
 RegistryEntry;
 type (2.ESB.Command.RegistryEntryType:INVOKE_METHOD
 
 identifier (	
 method_guid (	
 
-proxy_guid (	"˚
+proxy_guid (	
+
+queue_name (	"º
 Cmd	
 ERROR
 RESPONSE
 ERROR_RESPONSE
 
-NODE_HELLO
-PROXY_HELLO
-PING
-PONG
+NODE_HELLO
+PING
+PONG
 
-INVOKE
-REGISTER_INVOKE	
-REGISTER_INVOKE_OK
-
-REGISTRY_EXCHANGE_REQUEST
-REGISTRY_EXCHANGE_RESPONSE
-PUBLISH
-	SUBSCRIBE"&
+INVOKE
+REGISTER_INVOKE
+REGISTER_INVOKE_OK	
+REGISTRY_EXCHANGE_REQUEST
+
+REGISTRY_EXCHANGE_RESPONSE
+PUBLISH
+	SUBSCRIBE
+	REG_QUEUE
+UNREG_QUEUE
+
+PEEK_QUEUE
+DEQUEUE_QUEUE
+	LEN_QUEUE"1
 RegistryEntryType
-INVOKE_METHOD
+INVOKE_METHOD	
+QUEUE

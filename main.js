@@ -36,7 +36,7 @@ function ESB(config) {
 	this.publisherSocket = zmq.socket('pub');
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDBUF, 256*1024);
 	this.publisherSocket.setsockopt(zmq.ZMQ_SNDHWM, 5000);
-	this.publisherSocket.setsockopt(zmq.ZMQ_BACKLOG, 500);
+	this.publisherSocket.setsockopt(zmq.ZMQ_BACKLOG, 5000);
 	this.publisherSocket.on('error', function(err){
 		console.log('publisherSocket error', err);
 		self.emit('error', err);
@@ -74,20 +74,9 @@ ESB.prototype.resubscribe = function(){
 				cmd: 'SUBSCRIBE',
 				identifier: identifier,
 				payload: 'please',
-				source_proxy_guid: self.guid
+				source_component_guid: self.guid
 			};
-			var buf = pb.Serialize(obj, "ESB.Command");
-			var b = new Buffer(guidSize + 1 + buf.length);
-			b.write(self.proxyGuid, 'binary');
-			b.write('\t', guidSize, 1, 'binary');
-			b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-			var now = +new Date;
-			if(now - self.lastSend < 3) {
-				self.sendQueue.push(b);
-			} else {
-				self.publisherSocket.send(b);
-				self.sendPostQueue();
-			}
+			self.addToSendQueue(obj);
 		})(c);
 	}
 };
@@ -143,6 +132,7 @@ ESB.prototype.connect= function(){
 	
 		self.subscribeSocket = zmq.socket('sub');
 		self.subscribeSocket.setsockopt(zmq.ZMQ_RCVBUF, 256*1024);
+		self.subscribeSocket.setsockopt(zmq.ZMQ_RCVHWM, 5000);
 		self.subscribeSocket.subscribe(self.guid);
 		self.resubscribe();
 
@@ -191,11 +181,6 @@ ESB.prototype.connect= function(){
 			self.ready = true;
 			console.log('connected successfully to %s %s', self.subscribeSocket.__connectStr, self.proxyGuid);
 			self.resubscribe();
-	
-			if(self.wasready === false){
-				self.emit('ready');
-				self.wasready = true;
-			}
 		
 			if(!self.intervalsSetedOn) {
 				setInterval(function(){
@@ -209,12 +194,14 @@ ESB.prototype.connect= function(){
 				}, 1000);
 				setInterval(function(){
 					self.ping();
-				}, self.config.proxyTimeout);
+				}, 1000);
 				setInterval(function(){
 					self.sendPostQueue();
-				}, 50);
+				}, 8);
 				self.intervalsSetedOn = true;
 			}
+			
+			self.ping(true);
 		});
 		// self.requestSocket.connect(connectStr);
 		//console.log('ESB Node %s connected', self.guid);
@@ -222,17 +209,24 @@ ESB.prototype.connect= function(){
 	});
 };
 
-ESB.prototype.ping = function(){
+ESB.prototype.ping = function(force){
 	// console.log('send ping to %s', this.guid, this.proxyGuid);
-	if(!this.ready || this.connecting) return;
+	if(!force && (!this.ready || this.connecting)) return;
+	if(!force && +new Date - this.lastPongResponse > this.config.proxyTimeout) {
+		this.ready = false;
+		clearTimeout(this.pingTimeoutId);
+		this.emit('disconnected');
+		this.connect();
+		return;
+	}
 	var cmdGuid = genGuid();
 	var guid = this.guid;
 	var obj = {
 		cmd: 'PING',
 		payload: 'hi',
-		guid_from: cmdGuid,
-		source_proxy_guid: guid,
-		//target_proxy_guid: ''
+		source_operation_guid: cmdGuid,
+		source_component_guid: guid,
+		//target_component_guid: ''
 	}
 	var buf = pb.Serialize(obj, "ESB.Command");
 	var id = null;
@@ -248,13 +242,21 @@ ESB.prototype.ping = function(){
 		delete self.responseCallbacks[cmdGuid];
 	}
 	
-	id = setTimeout(timeout, this.config.proxyTimeout);
+	clearTimeout(self.pingTimeoutId);
+	self.pingTimeoutId = setTimeout(timeout, this.config.proxyTimeout);
 	
 	this.responseCallbacks[cmdGuid] = function(err, data, errString){
 		//console.log('pong %s', cmdGuid);
 		self.ready = true;
-		if(id) clearTimeout(id);
+		clearTimeout(self.pingTimeoutId);
 		delete self.responseCallbacks[cmdGuid];
+		
+		if(self.wasready === false){
+			self.emit('ready');
+			self.wasready = true;
+		}
+		
+		self.lastPongResponse = +new Date;
 	}
 	
 	
@@ -277,7 +279,7 @@ ESB.prototype.onMessage= function(data) {
 		{
 		case 'INVOKE':
 			//console.log('got INVOKE request', respObj);
-			var fn = this.invokeMethods[respObj.guid_to].method;
+			var fn = this.invokeMethods[respObj.target_operation_guid].method;
 			if(!fn) {
 				console.log('can not find such invoke method', respObj, Object.keys(this.invokeMethods));
 				break;
@@ -286,23 +288,23 @@ ESB.prototype.onMessage= function(data) {
 			break;
 		case 'ERROR_RESPONSE':
 			//console.log('got ERROR_RESPONSE', respObj);
-			var fn = this.responseCallbacks[respObj.guid_to];
+			var fn = this.responseCallbacks[respObj.target_operation_guid];
 			if(fn){
-				delete this.responseCallbacks[respObj.guid_to];
+				delete this.responseCallbacks[respObj.target_operation_guid];
 				fn('ERROR_RESPONSE', null, respObj.payload.toString());
 			} else {
-				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
+				console.log('callback "%s" for response not found', respObj.target_operation_guid, respObj, respObj.payload.toString());
 			}
 			break;
 		case 'PONG':
 		case 'RESPONSE':
 			//console.log('got RESPONSE', respObj);
-			var fn = this.responseCallbacks[respObj.guid_to];
+			var fn = this.responseCallbacks[respObj.target_operation_guid];
 			if(fn){
-				delete this.responseCallbacks[respObj.guid_to];
+				delete this.responseCallbacks[respObj.target_operation_guid];
 				fn(null, JSON.parse(respObj.payload.toString()), null);
 			} else {
-				console.log('callback "%s" for response not found', respObj.guid_to, respObj, respObj.payload.toString());
+				console.log('callback "%s" for response not found', respObj.target_operation_guid, respObj, respObj.payload.toString());
 			}
 			break;
 		case 'PING':
@@ -310,8 +312,8 @@ ESB.prototype.onMessage= function(data) {
 			var obj = {
 				cmd: 'PONG',
 				payload: +new Date,
-				guid_to: respObj.guid_from,
-				guid_from: this.guid,
+				target_operation_guid: respObj.source_operation_guid,
+				source_operation_guid: this.guid,
 			}
 			var buf = pb.Serialize(obj, "ESB.Command");
 			var b = new Buffer(guidSize + 1 + buf.length);
@@ -322,17 +324,17 @@ ESB.prototype.onMessage= function(data) {
 			break;
 		case 'ERROR':
 			console.log('driver got ERROR response from Proxy: ', respObj.payload.toString());
-			if(this.responseCallbacks[respObj.guid_to]){
-				var fn = this.responseCallbacks[respObj.guid_to];
+			if(this.responseCallbacks[respObj.target_operation_guid]){
+				var fn = this.responseCallbacks[respObj.target_operation_guid];
 				fn(respObj.cmd, null, respObj.payload.toString());
 			}
 			break;
 		case 'REGISTER_INVOKE_OK':
-			//console.log("REGISTER_INVOKE_OK for %s from Proxy %s", respObj.payload, respObj.source_proxy_guid);
+			//console.log("REGISTER_INVOKE_OK for %s from Proxy %s", respObj.payload, respObj.source_component_guid);
 			break;
 		case 'PUBLISH':
 			this.emit('subscribe_'+respObj.identifier, {
-				channel: channel, 
+				channel: channel.toString(), 
 				data:JSON.parse(respObj.payload.toString()
 			)});
 			break;
@@ -340,10 +342,65 @@ ESB.prototype.onMessage= function(data) {
 			console.log("unknown operation", respObj);
 		}
 	} catch(e){
-		console.log('ERROR while processing message', e);
+		console.log('ERROR while processing message', e, e.stack);
 		console.log(data.toString());
 	}
 };
+
+ESB.prototype.regQueue = function(channel, queueName) {
+	var obj = {
+		cmd: 'REG_QUEUE',
+		identifier: channel,
+		payload: queueName,
+		target_operation_guid: this.proxyGuid,
+		source_operation_guid: this.guid,
+	}
+	
+	this.addToSendQueue(obj);
+}
+
+ESB.prototype.unregQueue = function(channel, queueName) {
+	var obj = {
+		cmd: 'UNREG_QUEUE',
+		identifier: channel,
+		payload: queueName,
+		target_operation_guid: this.proxyGuid,
+		source_operation_guid: this.guid,
+	}
+	
+	this.addToSendQueue(obj);
+}
+
+ESB.prototype.peek = function(channel, queueName, timeout_ms, cb) {
+	var cmdGuid = genGuid();
+	var self = this;
+	
+	this.responseCallbacks[cmdGuid] = function(err, data, errString){
+		delete self.responseCallbacks[cmdGuid];
+		if(data == null) {
+			cb(null, function(){}, null);
+			return;
+		}
+		cb(data[1], function done(){
+			var obj = {
+				cmd: 'DEQUEUE_QUEUE',
+				identifier: channel,
+				payload: queueName+'\t'+data[0],
+				source_component_guid: self.guid,
+				source_operation_guid: cmdGuid,
+			}
+			self.addToSendQueue(obj);
+		}, data[0]);
+	}
+	var obj = {
+		cmd: 'PEEK_QUEUE',
+		identifier: channel,
+		payload: queueName+'\t'+timeout_ms,
+		source_component_guid: this.guid,
+		source_operation_guid: cmdGuid,
+	}
+	this.addToSendQueue(obj);
+}
 
 ESB.prototype.invoke = function(identifier, data, cb, options){
 	if(!this.ready){
@@ -391,37 +448,45 @@ ESB.prototype.invoke = function(identifier, data, cb, options){
 			cmd: 'INVOKE',
 			identifier: identifier,
 			payload: JSON.stringify(data),
-			guid_from: cmdGuid,
-			//target_proxy_guid: this.proxyGuid,
-			source_proxy_guid: this.guid,
+			source_operation_guid: cmdGuid,
+			//target_component_guid: this.proxyGuid,
+			source_component_guid: self.guid,
 			//start_time: +new Date,
 			//timeout_ms: options.timeout
 		}
 		//console.log(obj, this.proxyGuid);
-		var buf = pb.Serialize(obj, "ESB.Command");
-		var b = new Buffer(guidSize + 1 + buf.length);
-		b.write(this.proxyGuid, 'binary');
-		b.write('\t', guidSize, 1, 'binary');
-		b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-		var now = +new Date;
-		if(now - this.lastSend < 3) {
-			this.sendQueue.push(b);
-		} else {
-			this.publisherSocket.send(b);
-			this.sendPostQueue();
-		}
+		self.addToSendQueue(obj);
 	} catch(e){
 		isCalled = true;
 		if(id) clearTimeout(id);
 		delete self.responseCallbacks[cmdGuid];
 		cb('Exception', null, 'Exception while encoding/sending message: '+e.toString());
 	}
-	
 	return cmdGuid;
 };
 
+ESB.prototype.addToSendQueue = function(obj) {
+	var self = this;
+	var buf = pb.Serialize(obj, "ESB.Command");
+	var b = new Buffer(guidSize + 1 + buf.length);
+	b.write(self.proxyGuid, 'binary');
+	b.write('\t', guidSize, 1, 'binary');
+	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
+	//var now = +new Date;
+//	if(now - self.lastSend < 8) {
+	if(self.sendQueue.length < 100) {
+		self.sendQueue.push(b);
+	} else {
+		self.sendQueue.push(b);
+		self.sendPostQueue();
+	}
+}
+
 ESB.prototype.sendPostQueue = function(){
 	if(!this.ready) return;
+	// if(this.sendQueue.length > 0) {
+	// 	console.log('sendPostQueue', this.sendQueue.length);
+	// }
 	for(var i=0;i<this.sendQueue.length;i++){
 		this.publisherSocket.send(this.sendQueue[i]);
 	}
@@ -438,20 +503,9 @@ ESB.prototype.publish = function(identifier, data, options) {
 		cmd: 'PUBLISH',
 		identifier: identifier,
 		payload: JSON.stringify(data),
-		source_proxy_guid: this.guid
+		source_component_guid: this.guid
 	};
-	var buf = pb.Serialize(obj, "ESB.Command");
-	var b = new Buffer(guidSize + 1 + buf.length);
-	b.write(this.proxyGuid, 'binary');
-	b.write('\t', guidSize, 1, 'binary');
-	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-	var now = +new Date;
-	if(now - this.lastSend < 3) {
-		this.sendQueue.push(b);
-	} else {
-		this.publisherSocket.send(b);
-		this.sendPostQueue();
-	}
+	this.addToSendQueue(obj);
 };
 
 ESB.prototype.subscribe = function(identifier, cb) {
@@ -468,20 +522,9 @@ ESB.prototype.subscribe = function(identifier, cb) {
 		cmd: 'SUBSCRIBE',
 		identifier: identifier,
 		payload: 'please',
-		source_proxy_guid: this.guid
+		source_component_guid: this.guid
 	};
-	var buf = pb.Serialize(obj, "ESB.Command");
-	var b = new Buffer(guidSize + 1 + buf.length);
-	b.write(this.proxyGuid, 'binary');
-	b.write('\t', guidSize, 1, 'binary');
-	b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-	var now = +new Date;
-	if(now - this.lastSend < 3) {
-		this.sendQueue.push(b);
-	} else {
-		this.publisherSocket.send(b);
-		this.sendPostQueue();
-	}
+	this.addToSendQueue(obj);
 };
 
 ESB.prototype.sendRegistry = function(){
@@ -525,35 +568,14 @@ ESB.prototype.register = function(_identifier, version, cb, options, internalCal
 				var obj = {
 					cmd: 'RESPONSE',
 					payload: JSON.stringify(resp),
-					guid_from: cmdGuid,
-					guid_to: data.guid_from,
-					//target_proxy_guid: self.proxyGuid,
-					source_proxy_guid: self.guid,
+					source_operation_guid: cmdGuid,
+					target_operation_guid: data.source_operation_guid,
+					//target_component_guid: self.proxyGuid,
+					source_component_guid: self.guid,
 					//start_time: +new Date,
 				}
 			
-				try {
-					if(err) {
-						obj.cmd = 'ERROR_RESPONSE';
-						obj.payload = JSON.stringify(err);
-					}
-					//console.log('invoke method send response',obj);
-					var buf = pb.Serialize(obj, "ESB.Command");
-					var b = new Buffer(guidSize + 1 + buf.length);
-					b.write(self.proxyGuid, 'binary');
-					b.write('\t', guidSize, 1, 'binary');
-					b.write(buf.toString('binary'), guidSize+1, buf.length, 'binary');
-					var now = +new Date;
-					if(now - self.lastSend < 3) {
-						self.sendQueue.push(b);
-					} else {
-						self.publisherSocket.send(b);
-						self.sendPostQueue();
-					}
-					//self.publisherSocket.send(b);
-				} catch(e){
-					console.log('Exception while encoding/sending message after invoke: '+e.toString(), resp);
-				}
+				self.addToSendQueue(obj);
 			
 			});
 		};
@@ -564,9 +586,9 @@ ESB.prototype.register = function(_identifier, version, cb, options, internalCal
 			cmd: 'REGISTER_INVOKE',
 			identifier: identifier,
 			payload: cmdGuid,
-			guid_from: cmdGuid,
-			//target_proxy_guid: this.proxyGuid,
-			source_proxy_guid: this.guid,
+			source_operation_guid: cmdGuid,
+			//target_component_guid: this.proxyGuid,
+			source_component_guid: this.guid,
 			start_time: +new Date,
 		}
 		//console.log('register',obj);

@@ -27,7 +27,16 @@ esb.on('ready', function(){
 	// 		});
 	// 	}
 	// }, 250);
-	
+	setInterval(function(){
+		esb.invoke('/Platform/GetAppData', {guid: 'F3F23619A2053C80E040CB0A146B48E9', partner: 7}, function(err, resp, errStr){
+			if(err){
+				console.log(err, errStr);
+				return;
+			}
+			//console.log('response', resp);
+			responses++;
+		});
+	}, 1000);
 	
 	esb.subscribe('/Platform/AppData/F3F23619A2053C80E040CB0A146B48E9', function(channel, data){
 		//console.log('data on %s: ', channel.toString(), data);

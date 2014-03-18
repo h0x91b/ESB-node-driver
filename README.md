@@ -93,6 +93,23 @@ API
 
 * ESB.subscribe(&lt;identifier>, &lt;version>, &lt;callback>)
 
+* ESB.regQueue(&lt;channelName>, &lt;persistentQueueName>)
+	
+	This will make a persistent queue &lt;persistentQueueName> from any publish
+
+* ESB.unregQueue(&lt;channelName>, &lt;persistentQueueName>)
+	
+	This will destroy persistent queue
+	
+* ESB.peek(&lt;channelName>, &lt;persistentQueueName>, &lt;timeoutMs>, &lt;callback>)
+	
+	Peek & lock entry from persistent queue for &lt;timeoutMs> or until `done` callback fired
+	
+	* callback -> function(msg, done, msgId)
+		
+		msg - message
+		done - done callback, fire it for dequeue
+		msgId - autoincrement id used internally in ESB
 
 Issues
 ===

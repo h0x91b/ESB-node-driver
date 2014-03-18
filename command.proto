@@ -1,0 +1,49 @@
+package ESB;
+
+message Command {
+	
+	enum Cmd {
+		ERROR = 1;
+		RESPONSE = 2;
+		ERROR_RESPONSE = 3;
+		NODE_HELLO = 4;
+		PING = 5;
+		PONG = 6;
+		INVOKE = 7;
+		REGISTER_INVOKE = 8;
+		REGISTER_INVOKE_OK = 9;
+		REGISTRY_EXCHANGE_REQUEST = 10;
+		REGISTRY_EXCHANGE_RESPONSE = 11;
+		PUBLISH = 12;
+		SUBSCRIBE = 13;
+		REG_QUEUE = 14;
+		UNREG_QUEUE = 15;
+		PEEK_QUEUE = 16;
+		DEQUEUE_QUEUE = 17;
+		LEN_QUEUE = 18;
+	};
+	
+	required Cmd cmd = 1;
+	required string source_component_guid = 2;
+	required bytes payload = 3;
+	optional string target_component_guid = 4;
+	optional string identifier = 5;
+	optional string source_operation_guid = 6;
+	optional string target_operation_guid = 7;
+	optional int32 recursion = 8;
+	
+	enum RegistryEntryType {
+		INVOKE_METHOD = 1;
+		QUEUE = 2;
+	};
+	
+	message RegistryEntry {
+		required RegistryEntryType type = 1 [default = INVOKE_METHOD];
+		required string identifier = 2;
+		required string method_guid = 3;
+		required string proxy_guid = 4;
+		optional string queue_name = 5;
+	};
+	
+	repeated RegistryEntry reg_entry = 9;
+}
