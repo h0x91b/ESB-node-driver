@@ -16,4 +16,7 @@ esb.on('ready', function(){
 		console.log('/math/plus cb #1 is invoked', data);
 		cb(null, data.a + data.b);
 	});
+	
+	esb.register('/math/minus', 1, function(data, cb){
+	});
 });

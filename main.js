@@ -106,6 +106,7 @@ ESB.prototype.connect= function(){
 		var entry = resp[Math.floor(Math.random()*resp.length)];
 		var d = entry.split('#');
 		var connectStr = d[1];
+		var connectFailureTimeoutId = null;
 		self.proxyGuid = d[0];
 		
 		if(self.requestSocket){
@@ -119,6 +120,13 @@ ESB.prototype.connect= function(){
 		});
 		self.requestSocket.on('error', function(err){
 			console.log('requestSocket error', err);
+			if(err.code == 'ECONNREFUSED')
+			{
+				console.log('connection failed to %s, remove entry from redis and try again', entry);
+				onConnectFailure();
+				if(connectFailureTimeoutId) clearTimeout(connectFailureTimeoutId);
+				return;
+			}
 			self.emit('error', err);
 		});
 		
@@ -141,7 +149,7 @@ ESB.prototype.connect= function(){
 			self.emit('error', err);
 		});
 		
-		setTimeout(function(){
+		function onConnectFailure(){
 			if(self.ready) return;
 			console.log('connection failed to %s, remove entry from redis and try again', entry);
 			self.redis.zrem('ZSET:PROXIES', entry, function(err, resp){
@@ -149,9 +157,13 @@ ESB.prototype.connect= function(){
 					console.log('error on zrem', err);
 				}
 				self.connecting = false;
-				self.connect();
+				setTimeout(function(){
+					self.connect();
+				}, 500);
 			});
-		}, self.config.proxyTimeout);
+		}
+		
+		connectFailureTimeoutId = setTimeout(onConnectFailure, self.config.proxyTimeout);
 		
 		console.log('connectStr', connectStr);
 		var host = connectStr.split(':')[0];

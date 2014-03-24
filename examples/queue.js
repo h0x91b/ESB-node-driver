@@ -27,6 +27,10 @@ esb.on('ready', function(){
 		}, 500);
 	}, 1000);
 	
+	esb.subscribe('/foo', function(){
+		
+	})
+	
 	setInterval(function(){
 		console.log(Array(42).join('='));
 		console.log('flush all queues now!');
